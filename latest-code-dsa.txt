@@ -1,0 +1,1838 @@
+// DSA Project
+// LMS (library management system)
+// Ayaan Qazi, Muhammad Rehan, Abdul Ahad
+
+#include <SFML/Graphics.hpp>
+#include <iostream>
+#include <string>
+#include <cctype> 
+
+using namespace sf;
+using namespace std;
+
+// Node structure for linked list
+struct BookNode {
+	string id;
+	string name;
+	string author;
+	string publisher;
+	string price;
+	BookNode* next;
+
+	BookNode(string bookId, string bookName, string bookAuthor, string bookPublisher, string bookPrice)
+		: id(bookId), name(bookName), author(bookAuthor), publisher(bookPublisher), price(bookPrice), next(nullptr) {}
+};
+
+BookNode* bookHead = nullptr; // Head of the linked list
+
+// Function to create a button with text
+void createButton(RenderWindow& window, RectangleShape& button, Text& buttonText, Font& font, const string& label, Vector2f position) {
+	button.setSize(Vector2f(200, 50));
+	button.setFillColor(Color::Blue);
+	button.setPosition(position);
+
+	buttonText.setFont(font);
+	buttonText.setString(label);
+	buttonText.setCharacterSize(24);
+	buttonText.setFillColor(Color::White);
+	buttonText.setPosition(
+		position.x + (button.getSize().x - buttonText.getGlobalBounds().width) / 2,
+		position.y + (button.getSize().y - buttonText.getGlobalBounds().height) / 4
+	);
+}
+
+// Function to insert a book into the linked list, ensuring the ID is unique
+void insertBook(const string& id, const string& name, const string& author, const string& publisher, const string& price) {
+	// Check for duplicate ID
+	BookNode* temp = bookHead;
+	while (temp) {
+		if (temp->id == id) {
+			return;
+		}
+		temp = temp->next;
+	}
+
+	// If the ID is unique, insert the new book
+	BookNode* newNode = new BookNode(id, name, author, publisher, price);
+	if (!bookHead) {
+		bookHead = newNode;
+	}
+	else {
+		temp = bookHead;
+		while (temp->next) {
+			temp = temp->next;
+		}
+		temp->next = newNode;
+	}
+}
+
+void searchBook(RenderWindow& window, Font& font) {
+	Text searchTitle, inputLabel, feedback, searchButtonLabel, exitButtonLabel, backButtonLabel;
+	RectangleShape searchButton, exitButton, backButton;
+
+	Vector2u windowSize = window.getSize();
+	// Load background texture
+	Texture bg_texture;
+	if (!bg_texture.loadFromFile("img/4.jpg")) {
+		std::cerr << "Error loading login background image!" << std::endl;
+	}
+	Sprite bg_sprite(bg_texture);
+	Vector2u textureSize = bg_texture.getSize();
+	float scaleX = static_cast<float>(windowSize.x) / textureSize.x;
+	float scaleY = static_cast<float>(windowSize.y) / textureSize.y;
+	bg_sprite.setScale(scaleX, scaleY);
+
+	RectangleShape darkOverlay(Vector2f(windowSize.x, windowSize.y));
+	darkOverlay.setFillColor(Color(0, 0, 0, 100));
+
+	bool alternate = true;
+	bool isInputBoxSelected = false;  // To track whether the input box is selected
+
+	searchTitle.setFont(font);
+	inputLabel.setFont(font);
+	feedback.setFont(font);
+	searchButtonLabel.setFont(font);
+	exitButtonLabel.setFont(font);
+	backButtonLabel.setFont(font);
+
+	// Set up form title
+	searchTitle.setString("Search Book");
+	searchTitle.setCharacterSize(36);
+	searchTitle.setFillColor(Color::White);
+	searchTitle.setPosition(window.getSize().x / 2 - searchTitle.getGlobalBounds().width / 2, 50);
+
+	// Set up input label
+	inputLabel.setString("Enter Book ID or Name:");
+	inputLabel.setCharacterSize(24);
+	inputLabel.setFillColor(Color::White);
+	inputLabel.setPosition(window.getSize().x / 2 - inputLabel.getGlobalBounds().width / 2, 150);
+
+	// Set up feedback text
+	feedback.setCharacterSize(20);
+	feedback.setFillColor(Color::Red);
+	feedback.setPosition(window.getSize().x / 2 - feedback.getGlobalBounds().width / 2 - 125, 300);
+
+	// Set up search button (width the same as the exit button)
+	searchButton.setSize(Vector2f(200, 50));  // Same size as exit button
+	searchButton.setFillColor(Color(255, 255, 255, 50));  // Lighter gray background
+	searchButton.setPosition(window.getSize().x / 2 - searchButton.getSize().x / 2, 440);
+
+	searchButtonLabel.setString("Search");
+	searchButtonLabel.setCharacterSize(24);
+	searchButtonLabel.setFillColor(Color::White);
+	searchButtonLabel.setPosition(window.getSize().x / 2 - searchButtonLabel.getGlobalBounds().width / 2, 450);
+
+	// Set up back button (below the search button)
+	backButton.setSize(Vector2f(200, 50));  // Same size as other buttons
+	backButton.setFillColor(Color(255, 255, 255, 50));  // Lighter gray background
+	backButton.setPosition(window.getSize().x / 2 - backButton.getSize().x / 2, 510);  // Below search button
+
+	backButtonLabel.setString("Back");
+	backButtonLabel.setCharacterSize(24);
+	backButtonLabel.setFillColor(Color::White);
+	backButtonLabel.setPosition(window.getSize().x / 2 - backButtonLabel.getGlobalBounds().width / 2, 520);  // Centered label
+
+	// Set up exit button (below the back button)
+	exitButton.setSize(Vector2f(200, 50));  // Same size as other buttons
+	exitButton.setFillColor(Color(255, 255, 255, 50));  // Lighter gray background
+	exitButton.setPosition(window.getSize().x / 2 - exitButton.getSize().x / 2, 580);  // Below back button
+
+	exitButtonLabel.setString("Exit");
+	exitButtonLabel.setCharacterSize(24);
+	exitButtonLabel.setFillColor(Color::White);
+	exitButtonLabel.setPosition(window.getSize().x / 2 - exitButtonLabel.getGlobalBounds().width / 2, 590);  // Centered label
+
+	// Create input and book details variables
+	std::string searchInput;
+	std::string bookDetails;
+
+	// Declare the input box (RectangleShape) outside the loop to keep it accessible
+	RectangleShape inputBox(Vector2f(300, 30));  // Size of input box
+	inputBox.setPosition(window.getSize().x / 2 - inputBox.getSize().x / 2, 220);  // Centered below input label
+	inputBox.setFillColor(Color::White);
+
+	while (window.isOpen()) {
+		Event event;
+		while (window.pollEvent(event)) {
+			if (event.type == Event::Closed) {
+				window.close();
+			}
+
+			if (event.type == Event::KeyPressed) {
+				if (event.key.code == Keyboard::Escape) {
+					return; // Exit to dashboard
+				}
+			}
+
+			if (event.type == Event::TextEntered) {
+				if (event.text.unicode == 8) { // Handle Backspace
+					if (!searchInput.empty()) {
+						searchInput.pop_back();
+					}
+				}
+				else if (event.text.unicode < 128) { // Handle normal characters
+					searchInput += static_cast<char>(event.text.unicode);
+				}
+			}
+
+			if (event.type == Event::MouseButtonPressed && event.mouseButton.button == Mouse::Left || event.key.code == Keyboard::Enter) {
+				Vector2f mousePos(Mouse::getPosition(window));
+				if (searchButton.getGlobalBounds().contains(mousePos)) {
+					BookNode* current = bookHead;
+					bool found = false;
+					while (current) {
+						if (current->id == searchInput || current->name == searchInput) {
+							feedback.setFillColor(Color::Green);
+							feedback.setString("Book Found:");
+							bookDetails = "Name: " + current->name + "\nAuthor: " + current->author + "\nPublisher: " + current->publisher + "\nPrice: $" + current->price;
+							found = true;
+							break;
+						}
+						current = current->next;
+					}
+					if (!found) {
+						if (alternate) {
+							alternate = false;
+							feedback.setString("Book not found, try again");
+						}
+						else {
+							alternate = true;
+							feedback.setString("Book not found.");
+						}
+						feedback.setFillColor(Color::Red);
+						bookDetails.clear();
+					}
+				}
+
+				// Back button functionality
+				if (backButton.getGlobalBounds().contains(mousePos)) {
+					return;  // Go back to the previous menu or main menu
+				}
+
+				// Exit button functionality
+				if (exitButton.getGlobalBounds().contains(mousePos)) {
+					window.close();  // Close the window when the exit button is clicked
+				}
+
+				// Detect if the input box is selected (clicked)
+				if (inputBox.getGlobalBounds().contains(mousePos)) {
+					isInputBoxSelected = true;
+				}
+				else {
+					isInputBoxSelected = false;
+				}
+			}
+		}
+
+		// Render the form
+		window.clear(Color::Black);
+		window.draw(bg_sprite);
+		window.draw(darkOverlay);
+		window.draw(searchTitle);
+		window.draw(inputLabel);
+		window.draw(searchButton);
+		window.draw(searchButtonLabel);
+		window.draw(backButton);
+		window.draw(backButtonLabel);
+		window.draw(exitButton);
+		window.draw(exitButtonLabel);
+		window.draw(feedback);
+
+		// Highlight input box when selected
+		if (isInputBoxSelected) {
+			inputBox.setOutlineThickness(3);
+			inputBox.setOutlineColor(Color::Cyan);  // Highlight the input box when selected
+		}
+		else {
+			inputBox.setOutlineThickness(1);
+			inputBox.setOutlineColor(Color::Black);  // Default outline color
+		}
+		window.draw(inputBox);
+
+		Text searchDisplay(searchInput, font, 24);
+		searchDisplay.setFillColor(Color::Black);
+		searchDisplay.setPosition(window.getSize().x / 2 - searchDisplay.getGlobalBounds().width / 2, 220);  // Centered in input box
+		window.draw(searchDisplay);
+
+		// Display book details if found
+		Text detailsDisplay(bookDetails, font, 20);
+		detailsDisplay.setFillColor(Color::Green);
+		detailsDisplay.setPosition(window.getSize().x / 2 - detailsDisplay.getGlobalBounds().width / 2 - 60, 330);
+		window.draw(detailsDisplay);
+
+		// Hover effect for Search button
+		if (searchButton.getGlobalBounds().contains(Mouse::getPosition(window).x, Mouse::getPosition(window).y)) {
+			searchButton.setFillColor(Color::Cyan);  // Change to cyan when hovered
+		}
+		else {
+			searchButton.setFillColor(Color(255, 255, 255, 50));  // Lighter gray background
+		}
+
+		// Hover effect for Back button
+		if (backButton.getGlobalBounds().contains(Mouse::getPosition(window).x, Mouse::getPosition(window).y)) {
+			backButton.setFillColor(Color::Yellow);  // Change to yellow when hovered
+		}
+		else {
+			backButton.setFillColor(Color(255, 255, 255, 50));  // Lighter gray background
+		}
+
+		// Hover effect for Exit button
+		if (exitButton.getGlobalBounds().contains(Mouse::getPosition(window).x, Mouse::getPosition(window).y)) {
+			exitButton.setFillColor(Color::Red);  // Change to red when hovered
+		}
+		else {
+			exitButton.setFillColor(Color(255, 255, 255, 50));  // Lighter gray background
+		}
+
+		window.display();
+	}
+}
+
+// Function to check if a string contains only digits
+bool isInteger(const std::string& str) {
+	for (char c : str) {
+		if (!isdigit(c)) {
+			return false;
+		}
+	}
+	return !str.empty();  // Ensure the string is not empty
+}
+
+void displayInsertBookForm(RenderWindow& window, Font& font) {
+	// Get window size
+	Vector2u windowSize = window.getSize();
+	// Load background texture
+	Texture bg_texture;
+	if (!bg_texture.loadFromFile("img/4.jpg")) {
+		std::cerr << "Error loading login background image!" << std::endl;
+	}
+	Sprite bg_sprite(bg_texture);
+	Vector2u textureSize = bg_texture.getSize();
+	float scaleX = static_cast<float>(windowSize.x) / textureSize.x;
+	float scaleY = static_cast<float>(windowSize.y) / textureSize.y;
+	bg_sprite.setScale(scaleX, scaleY);
+
+	RectangleShape darkOverlay(Vector2f(windowSize.x, windowSize.y));
+	darkOverlay.setFillColor(Color(0, 0, 0, 100));
+
+	// Create title and feedback text
+	Text formTitle, idLabel, nameLabel, authorLabel, publisherLabel, priceLabel, feedback, exitText, backButtonLabel;
+	formTitle.setFont(font);
+	idLabel.setFont(font);
+	nameLabel.setFont(font);
+	authorLabel.setFont(font);
+	publisherLabel.setFont(font);
+	priceLabel.setFont(font);
+	feedback.setFont(font);
+	exitText.setFont(font);
+	backButtonLabel.setFont(font);
+
+
+	// Title for the form
+	formTitle.setString("Insert Book");
+	formTitle.setCharacterSize(36);
+	formTitle.setFillColor(Color::White);
+	formTitle.setPosition(windowSize.x / 2 - formTitle.getGlobalBounds().width / 2, 50);
+
+	// Label for ID, Name, Author, Publisher with proper spacing
+	idLabel.setString("Book ID:");
+	idLabel.setCharacterSize(24);
+	idLabel.setFillColor(Color::White);
+	idLabel.setPosition(windowSize.x / 2 - idLabel.getGlobalBounds().width / 2, 150);
+
+	nameLabel.setString("Book Name:");
+	nameLabel.setCharacterSize(24);
+	nameLabel.setFillColor(Color::White);
+	nameLabel.setPosition(windowSize.x / 2 - nameLabel.getGlobalBounds().width / 2, 220);
+
+	authorLabel.setString("Author:");
+	authorLabel.setCharacterSize(24);
+	authorLabel.setFillColor(Color::White);
+	authorLabel.setPosition(windowSize.x / 2 - authorLabel.getGlobalBounds().width / 2, 290);
+
+	publisherLabel.setString("Publisher:");
+	publisherLabel.setCharacterSize(24);
+	publisherLabel.setFillColor(Color::White);
+	publisherLabel.setPosition(windowSize.x / 2 - publisherLabel.getGlobalBounds().width / 2, 360);
+
+	priceLabel.setString("Price: $");
+	priceLabel.setCharacterSize(24);
+	priceLabel.setFillColor(Color::White);
+	priceLabel.setPosition(windowSize.x / 2 - publisherLabel.getGlobalBounds().width / 2, 430);
+
+	// Feedback and exit messages
+	feedback.setCharacterSize(20);
+	feedback.setFillColor(Color::Green);
+	feedback.setPosition(windowSize.x / 2 - feedback.getGlobalBounds().width - 200 / 2, 500);
+
+	// Submit button
+	RectangleShape submitButton;
+	Text submitButtonText;
+	createButton(window, submitButton, submitButtonText, font, "Submit", Vector2f(windowSize.x / 2 - 100, 600)); // Centered button
+
+	// Exit button
+	RectangleShape exitButton;
+	Text exitButtonText;
+	createButton(window, exitButton, exitButtonText, font, "Exit", Vector2f(windowSize.x / 2 - 100, 800)); // Exit button below submit
+
+	// Back button (new)
+	RectangleShape backButton;
+	Text backButtonText;
+	createButton(window, backButton, backButtonText, font, "Back", Vector2f(windowSize.x / 2 - 100, 700)); // Back button below exit button
+
+	// Input fields
+	string idInput, nameInput, authorInput, publisherInput, priceInput;
+	int activeField = -1; // -1: No active field, 0: ID, 1: Name, 2: Author, 3: Publisher, 4: Price
+
+	// Input box shapes (for mouse click)
+	RectangleShape idBox(Vector2f(300, 30));
+	RectangleShape nameBox(Vector2f(300, 30));
+	RectangleShape priceBox(Vector2f(300, 30));
+	RectangleShape authorBox(Vector2f(300, 30));
+	RectangleShape publisherBox(Vector2f(300, 30));
+
+	// Centering input boxes and setting spacing
+	idBox.setPosition(windowSize.x / 2 - idBox.getSize().x / 2, 180); // Adjusting y-position
+	nameBox.setPosition(windowSize.x / 2 - nameBox.getSize().x / 2, 250); // Adjusting y-position
+	priceBox.setPosition(windowSize.x / 2 - priceBox.getSize().x / 2, 460); // Adjusting y-position
+	authorBox.setPosition(windowSize.x / 2 - authorBox.getSize().x / 2, 320); // Adjusting y-position
+	publisherBox.setPosition(windowSize.x / 2 - publisherBox.getSize().x / 2, 390); // Adjusting y-position
+
+	// Set default colors for input boxes
+	idBox.setFillColor(Color::White);
+	nameBox.setFillColor(Color::White);
+	authorBox.setFillColor(Color::White);
+	publisherBox.setFillColor(Color::White);
+	priceBox.setFillColor(Color::White);
+
+	while (window.isOpen()) {
+		Event event;
+		while (window.pollEvent(event)) {
+			if (event.type == Event::Closed) {
+				window.close();
+			}
+
+			if (event.type == Event::KeyPressed) {
+				if (event.key.code == Keyboard::Escape) {
+					return; // Exit to dashboard
+				}
+			}
+
+			if (event.type == Event::TextEntered) {
+				if (event.text.unicode == 13) { // Handle Enter key
+					activeField = (activeField + 1) % 4;
+				}
+				else if (event.text.unicode == 8) { // Handle Backspace key
+					if (activeField == 0 && !idInput.empty()) {
+						idInput.pop_back();
+					}
+					else if (activeField == 1 && !nameInput.empty()) {
+						nameInput.pop_back();
+					}
+					else if (activeField == 2 && !authorInput.empty()) {
+						authorInput.pop_back();
+					}
+					else if (activeField == 3 && !publisherInput.empty()) {
+						publisherInput.pop_back();
+					}
+					else if (activeField == 4 && !priceInput.empty()) {
+						priceInput.pop_back();
+					}
+				}
+				else if (event.text.unicode < 128) { // Handle normal characters
+					char typedChar = static_cast<char>(event.text.unicode);
+					if (activeField == 0) {
+						idInput += typedChar;
+					}
+					else if (activeField == 1) {
+						nameInput += typedChar;
+					}
+					else if (activeField == 2) {
+						authorInput += typedChar;
+					}
+					else if (activeField == 3) {
+						publisherInput += typedChar;
+					}
+					else if (activeField == 4) {
+						priceInput += typedChar;
+					}
+				}
+			}
+
+			// Handle mouse click for selecting the active field
+			if (event.type == Event::MouseButtonPressed && event.mouseButton.button == Mouse::Left) {
+				Vector2f mousePos(Mouse::getPosition(window));
+
+				// Check if click is inside the input box bounds
+				if (idBox.getGlobalBounds().contains(mousePos)) {
+					activeField = 0;
+				}
+				else if (nameBox.getGlobalBounds().contains(mousePos)) {
+					activeField = 1;
+				}
+				else if (authorBox.getGlobalBounds().contains(mousePos)) {
+					activeField = 2;
+				}
+				else if (publisherBox.getGlobalBounds().contains(mousePos)) {
+					activeField = 3;
+				}
+				else if (priceBox.getGlobalBounds().contains(mousePos)) {
+					activeField = 4;
+				}
+
+				// Check if submit button is clicked
+				if (submitButton.getGlobalBounds().contains(mousePos)) {
+					if (!idInput.empty() && !nameInput.empty() && !authorInput.empty() && !publisherInput.empty() && !priceInput.empty()) {
+						// Check if the Book ID is an integer
+						if (!isInteger(idInput)) {
+							feedback.setFillColor(Color::Red);
+							feedback.setString("Book ID must be an integer.");
+						}
+						else {
+							// Check for unique ID before insertion
+							BookNode* temp = bookHead;
+							bool idExists = false;
+							while (temp) {
+								if (temp->id == idInput) {
+									idExists = true;
+									break;
+								}
+								temp = temp->next;
+							}
+
+							if (idExists) {
+								feedback.setFillColor(Color::Red);
+								feedback.setString("Book ID already exists. Please choose another.");
+							}
+							else {
+								insertBook(idInput, nameInput, authorInput, publisherInput, priceInput);
+								feedback.setFillColor(Color::Green);
+								feedback.setString("Book inserted successfully!");
+								idInput.clear();
+								nameInput.clear();
+								authorInput.clear();
+								publisherInput.clear();
+								priceInput.clear();
+							}
+						}
+					}
+					else {
+						feedback.setFillColor(Color::Red);
+						feedback.setString("Please fill all fields.");
+					}
+				}
+
+				// Exit button functionality
+				if (exitButton.getGlobalBounds().contains(mousePos)) {
+					window.close();
+				}
+
+				// Back button functionality
+				if (backButton.getGlobalBounds().contains(mousePos)) {
+					// Return to main menu or dashboard
+					return; // Adjust this if you have a function to go back to the main menu
+				}
+			}
+		}
+
+		// Update input box colors based on active field
+		idBox.setFillColor(activeField == 0 ? Color::Cyan : Color(255, 255, 255, 50));
+		nameBox.setFillColor(activeField == 1 ? Color::Cyan : Color(255, 255, 255, 50));
+		authorBox.setFillColor(activeField == 2 ? Color::Cyan : Color(255, 255, 255, 50));
+		publisherBox.setFillColor(activeField == 3 ? Color::Cyan : Color(255, 255, 255, 50));
+		priceBox.setFillColor(activeField == 4 ? Color::Cyan : Color(255, 255, 255, 50));
+
+		// Hover effects for buttons
+		Vector2f mousePos(Mouse::getPosition(window));
+
+		// Submit button hover effect
+		if (submitButton.getGlobalBounds().contains(mousePos)) {
+			submitButton.setFillColor(Color::Green);
+		}
+		else {
+			submitButton.setFillColor(Color(255, 255, 255, 50));
+		}
+
+		// Back button hover effect
+		if (backButton.getGlobalBounds().contains(mousePos)) {
+			backButton.setFillColor(Color::Yellow);
+		}
+		else {
+			backButton.setFillColor(Color(255, 255, 255, 50));
+		}
+
+		// Exit button hover effect
+		if (exitButton.getGlobalBounds().contains(mousePos)) {
+			exitButton.setFillColor(Color::Red);
+		}
+		else {
+			exitButton.setFillColor(Color(255, 255, 255, 50));
+		}
+
+		// Render the form
+		window.clear(Color::Black);
+		window.draw(bg_sprite);
+		window.draw(darkOverlay);
+		window.draw(formTitle);
+		window.draw(idLabel);
+		window.draw(nameLabel);
+		window.draw(authorLabel);
+		window.draw(publisherLabel);
+		window.draw(priceLabel);
+
+		// Draw input boxes
+		window.draw(idBox);
+		window.draw(nameBox);
+		window.draw(authorBox);
+		window.draw(publisherBox);
+		window.draw(priceBox);
+
+		window.draw(submitButton);
+		window.draw(submitButtonText);
+		window.draw(exitButton);
+		window.draw(exitButtonText);
+		window.draw(backButton);
+		window.draw(backButtonText);
+
+		// Display input values
+		Text idDisplay(idInput, font, 24);
+		idDisplay.setFillColor(Color::Black);
+		idDisplay.setPosition(windowSize.x / 2 - idDisplay.getGlobalBounds().width / 2, 180); // Adjusting position to match input box
+		window.draw(idDisplay);
+
+		Text nameDisplay(nameInput, font, 24);
+		nameDisplay.setFillColor(Color::Black);
+		nameDisplay.setPosition(windowSize.x / 2 - nameDisplay.getGlobalBounds().width / 2, 250); // Adjusting position to match input box
+		window.draw(nameDisplay);
+
+		Text authorDisplay(authorInput, font, 24);
+		authorDisplay.setFillColor(Color::Black);
+		authorDisplay.setPosition(windowSize.x / 2 - authorDisplay.getGlobalBounds().width / 2, 320); // Adjusting position to match input box
+		window.draw(authorDisplay);
+
+		Text publisherDisplay(publisherInput, font, 24);
+		publisherDisplay.setFillColor(Color::Black);
+		publisherDisplay.setPosition(windowSize.x / 2 - publisherDisplay.getGlobalBounds().width / 2, 390); // Adjusting position to match input box
+		window.draw(publisherDisplay);
+
+		Text priceDisplay(priceInput, font, 24);
+		priceDisplay.setFillColor(Color::Black);
+		priceDisplay.setPosition(windowSize.x / 2 - publisherDisplay.getGlobalBounds().width / 2, 460);
+		window.draw(priceDisplay);
+
+		window.draw(feedback);
+		window.display();
+	}
+}
+
+// Function to search for a book by ID
+BookNode* searchBookById(const std::string& bookId) {
+	BookNode* temp = bookHead;
+	while (temp) {
+		if (temp->id == bookId) {
+			return temp;  // Book found
+		}
+		temp = temp->next;
+	}
+	return nullptr;  // Book not found
+}
+
+void displayUpdateFields(RenderWindow& window, Font& font, BookNode* bookToUpdate) {
+	// Get window size
+	Vector2u windowSize = window.getSize();
+	// Load background texture
+	Texture bg_texture;
+	if (!bg_texture.loadFromFile("img/4.jpg")) {
+		std::cerr << "Error loading login background image!" << std::endl;
+	}
+	Sprite bg_sprite(bg_texture);
+	Vector2u textureSize = bg_texture.getSize();
+	float scaleX = static_cast<float>(windowSize.x) / textureSize.x;
+	float scaleY = static_cast<float>(windowSize.y) / textureSize.y;
+	bg_sprite.setScale(scaleX, scaleY);
+
+	RectangleShape darkOverlay(Vector2f(windowSize.x, windowSize.y));
+	darkOverlay.setFillColor(Color(0, 0, 0, 100));
+
+	// Create title, current book details, and update feedback
+	Text formTitle, currentInfoTitle, nameLabel, authorLabel, publisherLabel, priceLabel, feedback;
+	formTitle.setFont(font);
+	currentInfoTitle.setFont(font);
+	nameLabel.setFont(font);
+	authorLabel.setFont(font);
+	publisherLabel.setFont(font);
+	priceLabel.setFont(font);
+	feedback.setFont(font);
+
+	// Title for the form
+	formTitle.setString("Update Book Info");
+	formTitle.setCharacterSize(36);
+	formTitle.setFillColor(Color::White);
+	formTitle.setPosition(windowSize.x / 2 - formTitle.getGlobalBounds().width / 2, 50);
+
+	// Current book info
+	currentInfoTitle.setString("Current Book Info:");
+	currentInfoTitle.setCharacterSize(24);
+	currentInfoTitle.setFillColor(Color::White);
+	currentInfoTitle.setPosition(windowSize.x / 2 - currentInfoTitle.getGlobalBounds().width / 2, 120);
+
+	// Display current information
+	Text nameText(bookToUpdate->name, font, 20);
+	nameText.setFillColor(Color::White);
+	nameText.setPosition(windowSize.x / 2 - nameText.getGlobalBounds().width / 2, 180);
+
+	Text authorText(bookToUpdate->author, font, 20);
+	authorText.setFillColor(Color::White);
+	authorText.setPosition(windowSize.x / 2 - authorText.getGlobalBounds().width / 2, 220);
+
+	Text publisherText(bookToUpdate->publisher, font, 20);
+	publisherText.setFillColor(Color::White);
+	publisherText.setPosition(windowSize.x / 2 - publisherText.getGlobalBounds().width / 2, 260);
+
+	Text priceText(bookToUpdate->price, font, 20);
+	priceText.setFillColor(Color::White);
+	priceText.setPosition(windowSize.x / 2 - priceText.getGlobalBounds().width / 2, 300);
+
+	// Labels for Name, Author, Publisher, and Price
+	nameLabel.setString("New Name:");
+	nameLabel.setCharacterSize(24);
+	nameLabel.setFillColor(Color::White);
+	nameLabel.setPosition(windowSize.x / 2 - nameLabel.getGlobalBounds().width / 2 - 300, 340);
+
+	authorLabel.setString("New Author:");
+	authorLabel.setCharacterSize(24);
+	authorLabel.setFillColor(Color::White);
+	authorLabel.setPosition(windowSize.x / 2 - authorLabel.getGlobalBounds().width / 2 - 300, 410);
+
+	publisherLabel.setString("New Publisher:");
+	publisherLabel.setCharacterSize(24);
+	publisherLabel.setFillColor(Color::White);
+	publisherLabel.setPosition(windowSize.x / 2 - publisherLabel.getGlobalBounds().width / 2 - 300, 480);
+
+	priceLabel.setString("New Price: $");
+	priceLabel.setCharacterSize(24);
+	priceLabel.setFillColor(Color::White);
+	priceLabel.setPosition(windowSize.x / 2 - priceLabel.getGlobalBounds().width / 2 - 300, 550);
+
+	// Input fields for name, author, publisher, price (with background)
+	string nameInput = bookToUpdate->name;
+	string authorInput = bookToUpdate->author;
+	string publisherInput = bookToUpdate->publisher;
+	string priceInput = bookToUpdate->price;
+
+	// Create submit, exit, and back buttons
+	RectangleShape submitButton;
+	Text submitButtonText;
+	createButton(window, submitButton, submitButtonText, font, "Submit Update", Vector2f(windowSize.x / 2 - 100, 620));
+
+	RectangleShape backButton;
+	Text backButtonText;
+	createButton(window, backButton, backButtonText, font, "Back", Vector2f(windowSize.x / 2 - 100, 690));
+
+	RectangleShape exitButton;
+	Text exitButtonText;
+	createButton(window, exitButton, exitButtonText, font, "Exit", Vector2f(windowSize.x / 2 - 100, 760));
+
+	// Handle mouse and keyboard input
+	int activeField = -1; // -1 means no field is selected initially
+	RectangleShape nameInputBackground(Vector2f(300, 40));
+	RectangleShape authorInputBackground(Vector2f(300, 40));
+	RectangleShape publisherInputBackground(Vector2f(300, 40));
+	RectangleShape priceInputBackground(Vector2f(300, 40));
+
+	nameInputBackground.setFillColor(Color(50, 50, 50)); // Dark gray background
+	authorInputBackground.setFillColor(Color(50, 50, 50));
+	publisherInputBackground.setFillColor(Color(50, 50, 50));
+	priceInputBackground.setFillColor(Color(50, 50, 50));
+
+	// Set positions of the input fields
+	nameInputBackground.setPosition(windowSize.x / 2 - 150, 340);
+	authorInputBackground.setPosition(windowSize.x / 2 - 150, 410);
+	publisherInputBackground.setPosition(windowSize.x / 2 - 150, 470);
+	priceInputBackground.setPosition(windowSize.x / 2 - 150, 540);
+
+	feedback.setCharacterSize(24);
+	feedback.setPosition(windowSize.x / 2 - feedback.getGlobalBounds().width / 2 - 150, 830); 
+
+	while (window.isOpen()) {
+		Event event;
+		while (window.pollEvent(event)) {
+			if (event.type == Event::Closed) {
+				window.close();
+			}
+
+			if (event.type == Event::TextEntered) {
+				if (event.text.unicode == 13) { // Enter key
+					activeField = (activeField + 1) % 4; // Move between name, author, publisher, price
+				}
+				else if (event.text.unicode == 8) { // Backspace key
+					if (activeField == 0 && !nameInput.empty()) {
+						nameInput.pop_back();
+					}
+					else if (activeField == 1 && !authorInput.empty()) {
+						authorInput.pop_back();
+					}
+					else if (activeField == 2 && !publisherInput.empty()) {
+						publisherInput.pop_back();
+					}
+					else if (activeField == 3 && !priceInput.empty()) {
+						priceInput.pop_back();
+					}
+				}
+				else if (event.text.unicode < 128) { // Normal character input
+					char typedChar = static_cast<char>(event.text.unicode);
+					if (activeField == 0) {
+						nameInput += typedChar;
+					}
+					else if (activeField == 1) {
+						authorInput += typedChar;
+					}
+					else if (activeField == 2) {
+						publisherInput += typedChar;
+					}
+					else if (activeField == 3) {
+						priceInput += typedChar;
+					}
+				}
+			}
+
+			// Mouse button presses
+			if (event.type == Event::MouseButtonPressed && event.mouseButton.button == Mouse::Left) {
+				Vector2f mousePos(Mouse::getPosition(window));
+
+				// Check if a text input box is clicked and set the active field
+				if (nameInputBackground.getGlobalBounds().contains(mousePos)) {
+					activeField = 0;
+				}
+				else if (authorInputBackground.getGlobalBounds().contains(mousePos)) {
+					activeField = 1;
+				}
+				else if (publisherInputBackground.getGlobalBounds().contains(mousePos)) {
+					activeField = 2;
+				}
+				else if (priceInputBackground.getGlobalBounds().contains(mousePos)) {
+					activeField = 3;
+				}
+				// Submit button clicked
+				if (submitButton.getGlobalBounds().contains(mousePos)) {
+					// Update the book details if all fields are filled
+					if (!nameInput.empty() && !authorInput.empty() && !publisherInput.empty() && !priceInput.empty()) {
+						bookToUpdate->name = nameInput;
+						bookToUpdate->author = authorInput;
+						bookToUpdate->publisher = publisherInput;
+						bookToUpdate->price = priceInput;
+
+						feedback.setFillColor(Color::Green);
+						feedback.setString("Book details updated successfully!");
+					}
+					else {
+						feedback.setFillColor(Color::Red);
+						feedback.setString("All fields must be filled.");
+					}
+				}
+
+				// Back button clicked
+				if (backButton.getGlobalBounds().contains(mousePos)) {
+					return; // Go back to previous screen (dashboard)
+				}
+
+				// Exit button clicked
+				if (exitButton.getGlobalBounds().contains(mousePos)) {
+					window.close(); // Exit the application
+				}
+			}
+		}
+
+		// Hover effects for buttons
+		Vector2f mousePos(Mouse::getPosition(window));
+		submitButton.setFillColor(submitButton.getGlobalBounds().contains(mousePos) ? Color::Cyan : Color(255, 255, 255, 50));
+		backButton.setFillColor(backButton.getGlobalBounds().contains(mousePos) ? Color::Cyan : Color(255, 255, 255, 50));
+		exitButton.setFillColor(exitButton.getGlobalBounds().contains(mousePos) ? Color::Red : Color(255, 255, 255, 50));
+
+		// Update input field backgrounds based on active field
+		if (activeField == 0) {
+			nameInputBackground.setFillColor(Color::Cyan);
+		}
+		else {
+			nameInputBackground.setFillColor(Color(255, 255, 255, 50));
+		}
+
+		if (activeField == 1) {
+			authorInputBackground.setFillColor(Color::Cyan);
+		}
+		else {
+			authorInputBackground.setFillColor(Color(255, 255, 255, 50));
+		}
+
+		if (activeField == 2) {
+			publisherInputBackground.setFillColor(Color::Cyan);
+		}
+		else {
+			publisherInputBackground.setFillColor(Color(255, 255, 255, 50));
+		}
+
+		if (activeField == 3) {
+			priceInputBackground.setFillColor(Color::Cyan);
+		}
+		else {
+			priceInputBackground.setFillColor(Color(255, 255, 255, 50));
+		}
+
+		// Render the form
+		window.clear(Color::Black);
+		window.draw(bg_sprite);
+		window.draw(darkOverlay);
+		window.draw(formTitle);
+		window.draw(currentInfoTitle);
+		window.draw(nameText);
+		window.draw(authorText);
+		window.draw(publisherText);
+		window.draw(priceText);
+
+		// Labels for new info fields
+		window.draw(nameLabel);
+		window.draw(authorLabel);
+		window.draw(publisherLabel);
+		window.draw(priceLabel);
+
+		// Draw input fields with a background (rectangle)
+		window.draw(nameInputBackground);
+		window.draw(authorInputBackground);
+		window.draw(publisherInputBackground);
+		window.draw(priceInputBackground);
+
+		// Draw text inside the input fields
+		Text nameDisplay(nameInput, font, 24);
+		nameDisplay.setFillColor(Color::White);
+		nameDisplay.setPosition(windowSize.x / 2 - nameDisplay.getGlobalBounds().width / 2, 340);
+		window.draw(nameDisplay);
+
+		Text authorDisplay(authorInput, font, 24);
+		authorDisplay.setFillColor(Color::White);
+		authorDisplay.setPosition(windowSize.x / 2 - authorDisplay.getGlobalBounds().width / 2, 410);
+		window.draw(authorDisplay);
+
+		Text publisherDisplay(publisherInput, font, 24);
+		publisherDisplay.setFillColor(Color::White);
+		publisherDisplay.setPosition(windowSize.x / 2 - publisherDisplay.getGlobalBounds().width / 2, 470);
+		window.draw(publisherDisplay);
+
+		Text priceDisplay(priceInput, font, 24);
+		priceDisplay.setFillColor(Color::White);
+		priceDisplay.setPosition(windowSize.x / 2 - priceDisplay.getGlobalBounds().width / 2, 540);
+		window.draw(priceDisplay);
+
+		// Draw buttons
+		window.draw(submitButton);
+		window.draw(submitButtonText);
+		window.draw(backButton);
+		window.draw(backButtonText);
+		window.draw(exitButton);
+		window.draw(exitButtonText);
+
+		// Draw feedback message
+		window.draw(feedback);
+
+		window.display();
+	}
+}
+
+void displayUpdateBookForm(RenderWindow& window, Font& font) {
+	// Get window size
+	Vector2u windowSize = window.getSize();
+	// Load background texture
+	Texture bg_texture;
+	if (!bg_texture.loadFromFile("img/4.jpg")) {
+		std::cerr << "Error loading login background image!" << std::endl;
+	}
+	Sprite bg_sprite(bg_texture);
+	Vector2u textureSize = bg_texture.getSize();
+	float scaleX = static_cast<float>(windowSize.x) / textureSize.x;
+	float scaleY = static_cast<float>(windowSize.y) / textureSize.y;
+	bg_sprite.setScale(scaleX, scaleY);
+
+	RectangleShape darkOverlay(Vector2f(windowSize.x, windowSize.y));
+	darkOverlay.setFillColor(Color(0, 0, 0, 100));
+
+	// Create title and feedback text
+	Text formTitle, idLabel, nameLabel, authorLabel, publisherLabel, feedback, exitText, backButtonLabel;
+	formTitle.setFont(font);
+	idLabel.setFont(font);
+	nameLabel.setFont(font);
+	authorLabel.setFont(font);
+	publisherLabel.setFont(font);
+	feedback.setFont(font);
+	exitText.setFont(font);
+	backButtonLabel.setFont(font);
+
+	// Title for the form
+	formTitle.setString("Update Book");
+	formTitle.setCharacterSize(36);
+	formTitle.setFillColor(Color::White);
+	formTitle.setPosition(windowSize.x / 2 - formTitle.getGlobalBounds().width / 2, 50);
+
+	idLabel.setString("Enter Book ID to Update:");
+	idLabel.setCharacterSize(24);
+	idLabel.setFillColor(Color::White);
+	idLabel.setPosition(windowSize.x / 2 - idLabel.getGlobalBounds().width / 2, 125);
+
+	// Submit button
+	RectangleShape submitButton;
+	Text submitButtonText;
+	createButton(window, submitButton, submitButtonText, font, "Search", Vector2f(windowSize.x / 2 - 100, 350));
+	// Exit button
+	RectangleShape exitButton;
+	Text exitButtonText;
+	createButton(window, exitButton, exitButtonText, font, "Exit", Vector2f(windowSize.x / 2 - 100, 490));
+
+	// Back button (new)
+	RectangleShape backButton;
+	Text backButtonText;
+	createButton(window, backButton, backButtonText, font, "Back", Vector2f(windowSize.x / 2 - 100, 420));
+
+	// Input fields
+	std::string idInput;
+	int activeField = -1; // -1: No active field, 0: ID input
+
+	// Input box shape (for mouse click)
+	RectangleShape idBox(Vector2f(300, 30));
+	idBox.setPosition(windowSize.x / 2 - idBox.getSize().x / 2, 180); // Adjusting y-position
+	idBox.setFillColor(Color::White);
+
+	BookNode* bookToUpdate = nullptr;
+
+	// Position for feedback message 50px below the submit button
+	feedback.setCharacterSize(24);
+	feedback.setPosition(windowSize.x / 2 - feedback.getGlobalBounds().width / 2 - 100, 350); // Positioned 50px below the submit button
+
+	while (window.isOpen()) {
+		Event event;
+		while (window.pollEvent(event)) {
+			if (event.type == Event::Closed) {
+				window.close();
+			}
+
+			if (event.type == Event::KeyPressed) {
+				if (event.key.code == Keyboard::Escape) {
+					return; // Exit to dashboard
+				}
+			}
+
+			if (event.type == Event::TextEntered) {
+				if (event.text.unicode == 13) { // Handle Enter key
+					activeField = (activeField + 1) % 1; // We only have one field here: ID input
+				}
+				else if (event.text.unicode == 8) { // Handle Backspace key
+					if (activeField == 0 && !idInput.empty()) {
+						idInput.pop_back();
+					}
+				}
+				else if (event.text.unicode < 128) { // Handle normal characters
+					char typedChar = static_cast<char>(event.text.unicode);
+					if (activeField == 0) {
+						idInput += typedChar;
+					}
+				}
+			}
+
+			// Handle mouse click for selecting the active field
+			if (event.type == Event::MouseButtonPressed && event.mouseButton.button == Mouse::Left) {
+				Vector2f mousePos(Mouse::getPosition(window));
+
+				// Check if click is inside the input box bounds
+				if (idBox.getGlobalBounds().contains(mousePos)) {
+					activeField = 0;
+				}
+
+				// Check if submit button is clicked
+				if (submitButton.getGlobalBounds().contains(mousePos)) {
+					if (!idInput.empty()) {
+						// Search for the book by ID
+						bookToUpdate = searchBookById(idInput);
+
+						if (bookToUpdate) {
+							feedback.setFillColor(Color::Green);
+							feedback.setString("");
+							displayUpdateFields(window, font, bookToUpdate);  // Call the next step to update details
+						}
+						else {
+							feedback.setFillColor(Color::Red);
+							feedback.setString("Book ID not found.");
+						}
+					}
+				}
+
+				// Exit button functionality
+				if (exitButton.getGlobalBounds().contains(mousePos)) {
+					window.close();
+				}
+
+				// Back button functionality
+				if (backButton.getGlobalBounds().contains(mousePos)) {
+					return; // Go back to the dashboard
+				}
+			}
+		}
+
+		// Hover effects for buttons
+		Vector2f mousePos(Mouse::getPosition(window));
+
+		// Submit button hover effect
+		submitButton.setFillColor(submitButton.getGlobalBounds().contains(mousePos) ? Color::Cyan : Color(255, 255, 255, 50));
+
+		// Back button hover effect
+		backButton.setFillColor(backButton.getGlobalBounds().contains(mousePos) ? Color::Cyan : Color(255, 255, 255, 50));
+
+		// Exit button hover effect
+		exitButton.setFillColor(exitButton.getGlobalBounds().contains(mousePos) ? Color::Red : Color(255, 255, 255, 50));
+
+
+		// Display input values
+		Text idDisplay(idInput, font, 24);
+		idDisplay.setFillColor(Color::Black);
+		idDisplay.setPosition(windowSize.x / 2 - idDisplay.getGlobalBounds().width / 2, 180); // Adjusting position to match input box
+
+		// Render the form
+		window.clear(Color::Black);
+		window.draw(bg_sprite);
+		window.draw(darkOverlay);
+		window.draw(formTitle);
+		window.draw(idLabel);
+
+		// Draw input box for ID
+		window.draw(idBox);
+
+		window.draw(submitButton);
+		window.draw(submitButtonText);
+		window.draw(exitButton);
+		window.draw(exitButtonText);
+		window.draw(backButton);
+		window.draw(backButtonText);
+
+		window.draw(idDisplay);
+
+		window.draw(feedback);
+		window.display();
+	}
+}
+
+void deleteBook(BookNode* bookToDelete) {
+	if (bookToDelete == bookHead) {
+		bookHead = bookHead->next;
+		delete bookToDelete;
+		return;
+	}
+
+	BookNode* temp = bookHead;
+	while (temp && temp->next != bookToDelete) {
+		temp = temp->next;
+	}
+
+	if (temp) {
+		temp->next = bookToDelete->next;
+		delete bookToDelete;
+	}
+}
+
+void displayDeleteBookForm(RenderWindow& window, Font& font) {
+	// Get window size
+	Vector2u windowSize = window.getSize();
+
+	// Load background texture
+	Texture bg_texture;
+	if (!bg_texture.loadFromFile("img/4.jpg")) {
+		std::cerr << "Error loading login background image!" << std::endl;
+	}
+	Sprite bg_sprite(bg_texture);
+	Vector2u textureSize = bg_texture.getSize();
+	float scaleX = static_cast<float>(windowSize.x) / textureSize.x;
+	float scaleY = static_cast<float>(windowSize.y) / textureSize.y;
+	bg_sprite.setScale(scaleX, scaleY);
+
+	RectangleShape darkOverlay(Vector2f(windowSize.x, windowSize.y));
+	darkOverlay.setFillColor(Color(0, 0, 0, 100));
+
+	// Create title, label, feedback, and buttons
+	Text formTitle, idLabel, feedback, deleteButtonText, backButtonText, exitButtonText;
+	formTitle.setFont(font);
+	idLabel.setFont(font);
+	feedback.setFont(font);
+	deleteButtonText.setFont(font);
+	backButtonText.setFont(font);
+	exitButtonText.setFont(font);
+
+	// Title for the form
+	formTitle.setString("Delete Book");
+	formTitle.setCharacterSize(36);
+	formTitle.setFillColor(Color::White);
+	formTitle.setPosition(windowSize.x / 2 - formTitle.getGlobalBounds().width / 2, 50);
+
+	// Label for Book ID
+	idLabel.setString("Book ID to delete:");
+	idLabel.setCharacterSize(24);
+	idLabel.setFillColor(Color::White);
+	idLabel.setPosition(windowSize.x / 2 - idLabel.getGlobalBounds().width / 2, 130);
+
+	// Feedback message
+	feedback.setCharacterSize(20);
+	feedback.setFillColor(Color::Green);
+	feedback.setPosition(windowSize.x / 2 - feedback.getGlobalBounds().width / 2 - 100, 575);
+
+	// Define button vertical spacing
+	float buttonSpacing = 20; // The gap between buttons
+
+	// Delete button
+	RectangleShape deleteButton;
+	createButton(window, deleteButton, deleteButtonText, font, "Delete", Vector2f(windowSize.x / 2 - 100, 350));
+
+	// Back button (placed below delete button)
+	RectangleShape backButton;
+	createButton(window, backButton, backButtonText, font, "Back", Vector2f(windowSize.x / 2 - 100, 420));
+
+	// Exit button (placed below back button)
+	RectangleShape exitButton;
+	createButton(window, exitButton, exitButtonText, font, "Exit", Vector2f(windowSize.x / 2 - 100, 490));
+
+	// Input field for Book ID
+	std::string idInput;
+	int activeField = -1; // -1 means no field is selected initially
+
+	// Input box shape for Book ID
+	RectangleShape idBox(Vector2f(300, 30));
+	idBox.setPosition(windowSize.x / 2 - idBox.getSize().x / 2, 180);
+	idBox.setFillColor(Color::White);
+
+	while (window.isOpen()) {
+		Event event;
+		while (window.pollEvent(event)) {
+			if (event.type == Event::Closed) {
+				window.close();
+			}
+
+			if (event.type == Event::KeyPressed) {
+				if (event.key.code == Keyboard::Escape) {
+					return; // Exit to previous screen
+				}
+			}
+
+			if (event.type == Event::TextEntered) {
+				if (event.text.unicode == 13) { // Enter key
+					// Trigger deletion
+					BookNode* bookToDelete = searchBookById(idInput);
+					if (bookToDelete) {
+						deleteBook(bookToDelete);
+						feedback.setFillColor(Color::Green);
+						feedback.setString("Book deleted successfully!");
+					}
+					else {
+						feedback.setFillColor(Color::Red);
+						feedback.setString("Book ID not found.");
+					}
+					idInput.clear(); // Clear input field after deletion
+				}
+				else if (event.text.unicode == 8) { // Backspace key
+					if (!idInput.empty()) {
+						idInput.pop_back();
+					}
+				}
+				else if (event.text.unicode < 128) { // Normal character input
+					char typedChar = static_cast<char>(event.text.unicode);
+					idInput += typedChar;
+				}
+			}
+
+			// Handle mouse click for selecting the active field
+			if (event.type == Event::MouseButtonPressed && event.mouseButton.button == Mouse::Left) {
+				Vector2f mousePos(Mouse::getPosition(window));
+
+				// Check if click is inside the input box bounds
+				if (idBox.getGlobalBounds().contains(mousePos)) {
+					activeField = 0;
+				}
+
+				// Check if delete button is clicked
+				if (deleteButton.getGlobalBounds().contains(mousePos)) {
+					BookNode* bookToDelete = searchBookById(idInput);
+					if (bookToDelete) {
+						deleteBook(bookToDelete);
+						feedback.setFillColor(Color::Green);
+						feedback.setString("Book deleted successfully!");
+					}
+					else {
+						feedback.setFillColor(Color::Red);
+						feedback.setString("Book ID not found.");
+					}
+					idInput.clear(); // Clear input after delete
+				}
+
+				// Back button functionality (returns to the dashboard or previous screen)
+				if (backButton.getGlobalBounds().contains(mousePos)) {
+					return; // Go back to the previous screen (librarian dashboard)
+				}
+
+				// Exit button functionality
+				if (exitButton.getGlobalBounds().contains(mousePos)) {
+					window.close();
+				}
+			}
+		}
+
+		// Update input box color based on active field
+		idBox.setFillColor(activeField == 0 ? Color::Cyan : Color::White);
+
+		// Hover effects for buttons
+		Vector2f mousePos(Mouse::getPosition(window));
+
+		// Delete button hover effect
+		deleteButton.setFillColor(deleteButton.getGlobalBounds().contains(mousePos) ? Color::Cyan : Color(255, 255, 255, 50));
+
+		// Back button hover effect
+		backButton.setFillColor(backButton.getGlobalBounds().contains(mousePos) ? Color::Cyan : Color(255, 255, 255, 50));
+
+		// Exit button hover effect
+		exitButton.setFillColor(exitButton.getGlobalBounds().contains(mousePos) ? Color::Cyan : Color(255, 255, 255, 50));
+
+		// Render the form
+		window.clear(Color::Black);
+		window.draw(bg_sprite);
+		window.draw(darkOverlay);
+		window.draw(formTitle);
+		window.draw(idLabel);
+
+		// Draw input box for Book ID
+		window.draw(idBox);
+
+		window.draw(deleteButton);
+		window.draw(deleteButtonText);
+		window.draw(backButton);
+		window.draw(backButtonText);
+		window.draw(exitButton);
+		window.draw(exitButtonText);
+
+		// Display the Book ID input
+		Text idDisplay(idInput, font, 24);
+		idDisplay.setFillColor(Color::Black);
+		idDisplay.setPosition(windowSize.x / 2 - idDisplay.getGlobalBounds().width / 2, 180);
+		window.draw(idDisplay);
+
+		window.draw(feedback);
+		window.display();
+	}
+}
+
+int getTotalBooksCount(BookNode* bookHead) {
+	int count = 0;
+	BookNode* current = bookHead;
+	while (current != nullptr) {
+		count++;
+		current = current->next;
+	}
+	return count;
+}
+
+void displayShowAllBooks(RenderWindow& window, Font& font, BookNode* bookHead) {
+	// Get window size
+	Vector2u windowSize = window.getSize();
+
+	Texture bg_texture;
+	if (!bg_texture.loadFromFile("img/4.jpg")) {
+		std::cerr << "Error loading background image!" << std::endl;
+	}
+	Sprite bg_sprite(bg_texture);
+	Vector2u textureSize = bg_texture.getSize();
+	float scaleX = static_cast<float>(windowSize.x) / textureSize.x;
+	float scaleY = static_cast<float>(windowSize.y) / textureSize.y;
+	bg_sprite.setScale(scaleX, scaleY);
+
+	RectangleShape darkOverlay(Vector2f(windowSize.x, windowSize.y));
+	darkOverlay.setFillColor(Color(0, 0, 0, 100));
+
+	// Create title, buttons, and feedback
+	Text formTitle, feedback, backButtonText, exitButtonText;
+	formTitle.setFont(font);
+	feedback.setFont(font);
+	backButtonText.setFont(font);
+	exitButtonText.setFont(font);
+
+	// Title for the form
+	formTitle.setString("All Available Books");
+	formTitle.setCharacterSize(36);
+	formTitle.setFillColor(Color::White);
+	formTitle.setPosition(windowSize.x / 2 - formTitle.getGlobalBounds().width / 2, 50);
+
+	// Feedback label for displaying info
+	feedback.setCharacterSize(20);
+	feedback.setFillColor(Color::Green);
+	feedback.setPosition(50, windowSize.y - 50);
+
+	// Define button vertical spacing
+	float buttonSpacing = 20; // The gap between buttons
+
+	// Back button
+	RectangleShape backButton;
+	createButton(window, backButton, backButtonText, font, "Back", Vector2f(windowSize.x / 2 - 100, windowSize.y - 300));
+
+	// Exit button
+	RectangleShape exitButton;
+	createButton(window, exitButton, exitButtonText, font, "Exit", Vector2f(windowSize.x / 2 - 100, windowSize.y - 200));
+
+	// Scrolling-related variables
+	static float scrollOffset = 0.0f; // Keeps track of how far we've scrolled
+	const float lineHeight = 40.f;     // Increased spacing between records (adjusted)
+	const float maxHeight = window.getSize().y - 150; // Max visible area for records (adjusted for buttons)
+
+	while (window.isOpen()) {
+		Event event;
+		while (window.pollEvent(event)) {
+			if (event.type == Event::Closed) {
+				window.close();
+			}
+
+			if (event.type == Event::KeyPressed && event.key.code == Keyboard::Escape) {
+				return; // Go back to the previous screen (librarian dashboard)
+			}
+
+
+			// Handle button clicks
+			if (event.type == Event::MouseButtonPressed && event.mouseButton.button == Mouse::Left) {
+				Vector2f mousePos(Mouse::getPosition(window));
+
+				// Back button functionality (returns to the dashboard)
+				if (backButton.getGlobalBounds().contains(mousePos)) {
+					return; // Go back to the previous screen
+				}
+
+				// Exit button functionality
+				if (exitButton.getGlobalBounds().contains(mousePos)) {
+					window.close();
+				}
+			}
+		}
+
+		// Render the background and title
+		window.clear(Color::Black);
+		window.draw(bg_sprite);
+		window.draw(darkOverlay);
+		window.draw(formTitle);
+
+		// Display the book records with scrolling
+		BookNode* current = bookHead;
+		float yOffset = 150 - scrollOffset;
+
+		// Loop through book records and display them
+		while (current != nullptr) {
+			Text bookText;
+			bookText.setFont(font);
+			bookText.setCharacterSize(24);
+			bookText.setFillColor(Color::White);
+
+			// Set the string for the record
+			bookText.setString("ID: " + current->id + " | Name: " + current->name + " | Author: " + current->author + " | Publisher: " + current->publisher + " | Price: $" + current->price);
+
+			// Set position for the text (y position adjusted by yOffset)
+			bookText.setPosition(50, yOffset);
+
+			// Draw the book record
+			window.draw(bookText);
+
+			// Move to the next record's position
+			yOffset += lineHeight;
+
+			// Stop rendering records if we've gone past the visible area of the window
+			if (yOffset > maxHeight + scrollOffset) {
+				break;
+			}
+
+			current = current->next;  // Move to the next book in the list
+		}
+
+		// Hover effects for buttons
+		Vector2f mousePos(Mouse::getPosition(window));
+		backButton.setFillColor(backButton.getGlobalBounds().contains(mousePos) ? Color::Cyan : Color(255, 255, 255, 50));
+		exitButton.setFillColor(exitButton.getGlobalBounds().contains(mousePos) ? Color::Red : Color(255, 255, 255, 50));
+
+		// Draw buttons
+		window.draw(backButton);
+		window.draw(backButtonText);
+		window.draw(exitButton);
+		window.draw(exitButtonText);
+
+		window.display();  // Render everything
+	}
+}
+
+// Function to display the librarian dashboard
+void librarianDashboard(RenderWindow& window, Font& font) {
+	sf::Vector2u windowSize = window.getSize();
+
+	// Load background texture
+	Texture bg_texture;
+	if (!bg_texture.loadFromFile("img/4.jpg")) {
+		std::cerr << "Error loading login background image!" << std::endl;
+	}
+	Sprite bg_sprite(bg_texture);
+	Vector2u textureSize = bg_texture.getSize();
+	float scaleX = static_cast<float>(windowSize.x) / textureSize.x;
+	float scaleY = static_cast<float>(windowSize.y) / textureSize.y;
+	bg_sprite.setScale(scaleX, scaleY);
+
+	RectangleShape darkOverlay(Vector2f(windowSize.x, windowSize.y));
+	darkOverlay.setFillColor(Color(0, 0, 0, 100));
+
+	// Dashboard title
+	Text dashboardTitle;
+	dashboardTitle.setFont(font);
+	dashboardTitle.setString("Librarian Dashboard");
+	dashboardTitle.setCharacterSize(36);
+	dashboardTitle.setFillColor(Color::White);
+	dashboardTitle.setPosition((windowSize.x - dashboardTitle.getGlobalBounds().width) / 2, 50);
+
+	// Buttons for librarian options
+	RectangleShape insertButton, searchButton, updateButton, deleteButton, showButton, backButton, exitButton;
+	Text insertText, searchText, updateText, deleteText, showText, backText, exitText;
+
+	createButton(window, insertButton, insertText, font, "Insert Book", Vector2f((windowSize.x - 200) / 2, 350));
+	createButton(window, searchButton, searchText, font, "Search Book", Vector2f((windowSize.x - 200) / 2, 420));
+	createButton(window, updateButton, updateText, font, "Update Book", Vector2f((windowSize.x - 200) / 2, 490));
+	createButton(window, deleteButton, deleteText, font, "Delete Book", Vector2f((windowSize.x - 200) / 2, 560));
+	createButton(window, showButton, showText, font, "Show All Books", Vector2f((windowSize.x - 200) / 2, 630));
+	createButton(window, backButton, backText, font, "Back to Menu", Vector2f((windowSize.x - 200) / 2, 700));
+	createButton(window, exitButton, exitText, font, "Exit", Vector2f((windowSize.x - 200) / 2, 770));
+
+	while (window.isOpen()) {
+		Event event;
+		while (window.pollEvent(event)) {
+			if (event.type == Event::Closed) {
+				window.close();
+			}
+
+			if (event.type == Event::MouseButtonPressed && event.mouseButton.button == Mouse::Left) {
+				Vector2f mousePos(Mouse::getPosition(window));
+				if (insertButton.getGlobalBounds().contains(mousePos)) {
+					displayInsertBookForm(window, font);
+				}
+				if (searchButton.getGlobalBounds().contains(mousePos)) {
+					searchBook(window, font);
+				}
+				if (updateButton.getGlobalBounds().contains(mousePos)) {
+					displayUpdateBookForm(window, font);
+				}
+				if (deleteButton.getGlobalBounds().contains(mousePos)) {
+					displayDeleteBookForm(window, font);
+				}
+				if (showButton.getGlobalBounds().contains(mousePos)) {
+					displayShowAllBooks(window, font, bookHead);
+				}
+				if (backButton.getGlobalBounds().contains(mousePos)) {
+					return; // Go back to the main menu
+				}
+				if (exitButton.getGlobalBounds().contains(mousePos)) {
+					window.close();
+				}
+			}
+		}
+
+		// Change button color on hover
+		Vector2f mousePos(Mouse::getPosition(window));
+		insertButton.setFillColor(insertButton.getGlobalBounds().contains(mousePos) ? Color::Cyan : (Color(255, 255, 255, 50)));
+		searchButton.setFillColor(searchButton.getGlobalBounds().contains(mousePos) ? Color::Cyan : (Color(255, 255, 255, 50)));
+		updateButton.setFillColor(updateButton.getGlobalBounds().contains(mousePos) ? Color::Cyan : (Color(255, 255, 255, 50)));
+		deleteButton.setFillColor(deleteButton.getGlobalBounds().contains(mousePos) ? Color::Cyan : (Color(255, 255, 255, 50)));
+		showButton.setFillColor(showButton.getGlobalBounds().contains(mousePos) ? Color::Cyan : (Color(255, 255, 255, 50)));
+		backButton.setFillColor(backButton.getGlobalBounds().contains(mousePos) ? Color::Cyan : (Color(255, 255, 255, 50)));
+		exitButton.setFillColor(exitButton.getGlobalBounds().contains(mousePos) ? Color::Red : (Color(255, 255, 255, 50)));
+
+		// Render dashboard
+		window.clear(Color::Black);
+		window.draw(bg_sprite);
+		window.draw(darkOverlay);
+		window.draw(dashboardTitle);
+		window.draw(insertButton);
+		window.draw(insertText);
+		window.draw(searchButton);
+		window.draw(searchText);
+		window.draw(updateButton);
+		window.draw(updateText);
+		window.draw(deleteButton);
+		window.draw(deleteText);
+		window.draw(showButton);
+		window.draw(showText);
+		window.draw(backButton);
+		window.draw(backText);
+		window.draw(exitButton);
+		window.draw(exitText);
+		window.display();
+	}
+}
+
+bool librarianLogin(RenderWindow& window, Font& font) {
+	Vector2u windowSize = window.getSize();
+
+	// Load background texture
+	Texture bg_texture;
+	if (!bg_texture.loadFromFile("img/5.jpg")) {
+		std::cerr << "Error loading login background image!" << std::endl;
+	}
+	Sprite bg_sprite(bg_texture);
+	Vector2u textureSize = bg_texture.getSize();
+	float scaleX = static_cast<float>(windowSize.x) / textureSize.x;
+	float scaleY = static_cast<float>(windowSize.y) / textureSize.y;
+	bg_sprite.setScale(scaleX, scaleY);
+
+	// Create a semi-transparent black overlay
+	RectangleShape darkOverlay(Vector2f(windowSize.x, windowSize.y));
+	darkOverlay.setFillColor(Color(0, 0, 0, 150)); // Black with 150 out of 255 alpha
+
+	// Title
+	Text loginTitle;
+	loginTitle.setFont(font);
+	loginTitle.setString("Librarian Login");
+	loginTitle.setCharacterSize(36);
+	loginTitle.setFillColor(Color(255, 255, 255, 255));
+	loginTitle.setPosition(windowSize.x / 2 - loginTitle.getGlobalBounds().width / 2, 50);
+
+	// Feedback text
+	Text feedback;
+	feedback.setFont(font);
+	feedback.setCharacterSize(20);
+	feedback.setFillColor(Color::Red);
+	feedback.setPosition(windowSize.x / 2 - 150, windowSize.y / 2 + 400);
+
+	// Input labels
+	Text usernameLabel, passwordLabel;
+	usernameLabel.setFont(font);
+	usernameLabel.setString("Username:");
+	usernameLabel.setCharacterSize(24);
+	usernameLabel.setFillColor(Color(255, 255, 255, 255));
+	usernameLabel.setOutlineColor(Color::Cyan); // Outline for contrast
+	usernameLabel.setOutlineThickness(1); // Thickness of the outline
+	usernameLabel.setPosition(windowSize.x / 2 - 150, windowSize.y / 2 - 250);
+
+	passwordLabel.setFont(font);
+	passwordLabel.setString("Password:");
+	passwordLabel.setCharacterSize(24);
+	passwordLabel.setFillColor(Color(255, 255, 255, 255));
+	passwordLabel.setOutlineColor(Color::Cyan); // Outline for contrast
+	passwordLabel.setOutlineThickness(1); // Thickness of the outline
+	passwordLabel.setPosition(windowSize.x / 2 - 150, windowSize.y / 2 - 100);
+
+	// Input boxes
+	RectangleShape usernameBox(Vector2f(300, 50)), passwordBox(Vector2f(300, 50));
+	usernameBox.setFillColor(Color(255, 255, 255, 50)); // Semi-transparent background
+	usernameBox.setOutlineThickness(2);
+	usernameBox.setOutlineColor(Color(255, 255, 255, 255));
+	usernameBox.setPosition(windowSize.x / 2 - 150, windowSize.y / 2 - 200);
+
+	passwordBox.setFillColor(Color(255, 255, 255, 50));
+	passwordBox.setOutlineThickness(2);
+	passwordBox.setOutlineColor(Color(255, 255, 255, 255));
+	passwordBox.setPosition(windowSize.x / 2 - 150, windowSize.y / 2 - 50);
+
+	// Buttons
+	RectangleShape loginButton, exitButton, backButton;
+	Text loginButtonText, exitButtonText, backButtonText;
+
+	// Create buttons and text
+	createButton(window, loginButton, loginButtonText, font, "Login", Vector2f(windowSize.x / 2 - 120, windowSize.y / 2 + 100));
+	createButton(window, exitButton, exitButtonText, font, "Exit", Vector2f(windowSize.x / 2 - 120, windowSize.y / 2 + 300));
+	createButton(window, backButton, backButtonText, font, "Back to Menu", Vector2f(windowSize.x / 2 - 120, windowSize.y / 2 + 200));
+
+	// Apply outline to button texts
+	loginButtonText.setOutlineColor(Color::Cyan);
+	loginButtonText.setOutlineThickness(1);
+
+	exitButtonText.setOutlineColor(Color::Cyan);
+	exitButtonText.setOutlineThickness(1);
+
+	backButtonText.setOutlineColor(Color::Cyan);
+	backButtonText.setOutlineThickness(1);
+
+	std::string usernameInput, passwordInput;
+	bool usernameActive = true, passwordActive = false;
+
+	while (window.isOpen()) {
+		Event event;
+		while (window.pollEvent(event)) {
+			if (event.type == Event::Closed) {
+				window.close();
+			}
+
+			if (event.type == Event::TextEntered) {
+				if (event.text.unicode == 13) { // Enter key switches focus
+					usernameActive = !usernameActive;
+					passwordActive = !passwordActive;
+				}
+				else if (event.text.unicode == '\b') { // Backspace
+					if (usernameActive && !usernameInput.empty()) {
+						usernameInput.pop_back();
+					}
+					else if (passwordActive && !passwordInput.empty()) {
+						passwordInput.pop_back();
+					}
+				}
+				else if (event.text.unicode < 128) { // Add characters
+					if (usernameActive) {
+						usernameInput += static_cast<char>(event.text.unicode);
+					}
+					else if (passwordActive) {
+						passwordInput += static_cast<char>(event.text.unicode);
+					}
+				}
+			}
+
+			if (event.type == Event::MouseButtonPressed && event.mouseButton.button == Mouse::Left) {
+				Vector2f mousePos(Mouse::getPosition(window));
+				if (usernameBox.getGlobalBounds().contains(mousePos)) {
+					usernameActive = true;
+					passwordActive = false;
+				}
+				else if (passwordBox.getGlobalBounds().contains(mousePos)) {
+					usernameActive = false;
+					passwordActive = true;
+				}
+				else if (loginButton.getGlobalBounds().contains(mousePos)) {
+					if ((usernameInput == "ayaan" || usernameInput == "rehan" || usernameInput == "ahad") && passwordInput == "bsse") {
+						return true;
+					}
+					else {
+						feedback.setString("Incorrect Username or Password!");
+					}
+				}
+				else if (exitButton.getGlobalBounds().contains(mousePos)) {
+					window.close();
+				}
+				else if (backButton.getGlobalBounds().contains(mousePos)) {
+					return 0;
+				}
+			}
+		}
+
+		// Hover effect for input boxes
+		Vector2f mousePos(Mouse::getPosition(window));
+		usernameBox.setOutlineColor(usernameBox.getGlobalBounds().contains(mousePos) ? Color::Cyan : (usernameActive ? Color::Green : Color::White));
+		passwordBox.setOutlineColor(passwordBox.getGlobalBounds().contains(mousePos) ? Color::Cyan : (passwordActive ? Color::Green : Color::White));
+
+		// Hover effect for buttons
+		loginButton.setFillColor(loginButton.getGlobalBounds().contains(mousePos) ? Color::Cyan : Color(255, 255, 255, 50));
+		exitButton.setFillColor(exitButton.getGlobalBounds().contains(mousePos) ? Color::Cyan : Color(255, 255, 255, 50));
+		backButton.setFillColor(backButton.getGlobalBounds().contains(mousePos) ? Color::Cyan : Color(255, 255, 255, 50));
+
+		// Render
+		window.clear(Color::Black);
+		window.draw(bg_sprite);
+		window.draw(darkOverlay); // Draw the dark overlay here
+		window.draw(loginTitle);
+		window.draw(usernameLabel);
+		window.draw(passwordLabel);
+		window.draw(usernameBox);
+		window.draw(passwordBox);
+		window.draw(feedback);
+		window.draw(loginButton);
+		window.draw(loginButtonText);
+		window.draw(exitButton);
+		window.draw(exitButtonText);
+		window.draw(backButton);
+		window.draw(backButtonText);
+
+		// Display input
+		Text usernameDisplay(usernameInput, font, 24);
+		usernameDisplay.setFillColor(Color::White);
+		usernameDisplay.setPosition(usernameBox.getPosition().x + 10, usernameBox.getPosition().y + 10);
+		window.draw(usernameDisplay);
+
+		Text passwordDisplay(std::string(passwordInput.size(), '*'), font, 24);
+		passwordDisplay.setFillColor(Color::White);
+		passwordDisplay.setPosition(passwordBox.getPosition().x + 10, passwordBox.getPosition().y + 10);
+		window.draw(passwordDisplay);
+
+		window.display();
+	}
+
+	return false;
+}
+
+int main() {
+	// Create the SFML window
+	VideoMode desktop = sf::VideoMode::getDesktopMode(); // Get the desktop resolution
+	RenderWindow window(desktop, "Library Management System", sf::Style::Fullscreen);
+
+	Vector2u windowSize = window.getSize();
+
+	// Load background image
+	Texture bg_texture;
+	if (!bg_texture.loadFromFile("img/3.jpg")) {
+		std::cerr << "Error loading login background image!" << std::endl;
+	}
+
+	Sprite bg_sprite(bg_texture);
+	Vector2u textureSize = bg_texture.getSize();
+
+	// Scale the background to fit the window
+	float scaleX = static_cast<float>(windowSize.x) / textureSize.x;
+	float scaleY = static_cast<float>(windowSize.y) / textureSize.y;
+	bg_sprite.setScale(scaleX, scaleY);
+
+	// Load font
+	Font font;
+	if (!font.loadFromFile("arial.ttf")) {
+		std::cerr << "Error loading font!\n";
+		return -1;
+	}
+
+	// Title text
+	Text title;
+	title.setFont(font);
+	title.setString("Library Management System");
+	title.setCharacterSize(36);
+	title.setFillColor(Color::White);
+	title.setPosition((windowSize.x - title.getGlobalBounds().width) / 2, 50);
+
+	// Buttons
+	RectangleShape librarianButton, exitButton;
+	Text librarianText, exitText;
+
+	// Button colors
+	Color defaultColor(173, 216, 230); // Pastel blue
+	Color hoverColor(100, 149, 237);  // Cornflower blue
+
+	// Create buttons
+	createButton(window, librarianButton, librarianText, font, "Librarian", Vector2f((windowSize.x - 200) / 2, 500));
+	createButton(window, exitButton, exitText, font, "Exit", Vector2f((windowSize.x - 200) / 2, 600));
+
+	while (window.isOpen()) {
+		Event event;
+		while (window.pollEvent(event)) {
+			if (event.type == Event::Closed) {
+				window.close();
+			}
+
+			if (event.type == Event::MouseButtonPressed && event.mouseButton.button == Mouse::Left) {
+				Vector2f mousePos(Mouse::getPosition(window));
+				if (librarianButton.getGlobalBounds().contains(mousePos)) {
+					if (librarianLogin(window, font)) {
+						librarianDashboard(window, font);
+					}
+				}
+				if (exitButton.getGlobalBounds().contains(mousePos)) {
+					window.close();
+				}
+			}
+		}
+
+		// Change button color on hover
+		Vector2f mousePos(Mouse::getPosition(window));
+		librarianButton.setFillColor(librarianButton.getGlobalBounds().contains(mousePos) ? hoverColor : defaultColor);
+		exitButton.setFillColor(exitButton.getGlobalBounds().contains(mousePos) ? hoverColor : defaultColor);
+
+		// Render
+		window.clear(Color::Black);  // Dark fallback if image fails to load
+		window.draw(bg_sprite);      // Draw background image
+		window.draw(title);
+		window.draw(librarianButton);
+		window.draw(librarianText);
+		window.draw(exitButton);
+		window.draw(exitText);
+		window.display();
+	}
+	return 0;
+}
